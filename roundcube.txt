@@ -1,0 +1,62 @@
+> sudo apt update
+> sudo apt install apache2 php php-mysql php-json php-xml php-intl php-mbstring php-pspell php-zip mariadb-server unzip
+> sudo systemctl start apache2
+> sudo systemctl enable apache2
+> sudo systemctl start mariadb
+> sudo systemctl enable MariaDB
+> sudo mysql_secure_installation
+> sudo mysql -u root -p
+	CREATE DATABASE roundcubemail;
+	CREATE USER 'roundcube'@'localhost' IDENTIFIED BY 'your_password';
+	GRANT ALL PRIVILEGES ON roundcubemail.* TO 'roundcube'@'localhost';
+	FLUSH PRIVILEGES;
+	EXIT;
+> wget https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz
+> tar -xvzf roundcubemail-1.6.3-complete.tar.gz
+> sudo mv roundcubemail-1.6.3 /var/www/html/roundcube
+> sudo chown -R www-data:www-data /var/www/html/roundcube
+> sudo chmod -R 755 /var/www/html/roundcube
+> sudo nano /etc/apache2/sites-available/roundcube.conf
+
+	# Add the following:
+	Alias /mail /var/www/html/roundcube
+
+	<Directory /var/www/html/roundcube/>
+    		Options -Indexes
+    		AllowOverride All
+    		Require all granted
+	</Directory>
+
+> sudo a2ensite roundcube.conf
+> sudo systemctl restart apache2
+> cd /var/www/html/roundcube
+> sudo cp config/config.inc.php.sample config/config.inc.php
+> sudo nano config/config.inc.php
+	$config['db_dsnw'] = 'mysql://roundcube:your_password@localhost/roundcubemail';
+	$config['smtp_host'] = 'localhost:25';
+> sudo php /var/www/html/roundcube/bin/initdb.sh --dir=/var/www/html/roundcube/SQL --create
+
+# Configure Postfix (if needed)
+> sudo nano /etc/postfix/main.cf
+	# disable SMTP VRFY command
+	disable_vrfy_command = yes
+
+	# require HELO command to sender hosts
+	smtpd_helo_required = yes
+
+	# limit an email size (10MB in this example)
+	message_size_limit = 10240000
+
+	# SMTP-Auth settings
+	smtpd_sasl_type = dovecot
+	smtpd_sasl_path = private/auth
+	smtpd_sasl_auth_enable = yes
+	smtpd_sasl_security_options = noanonymous
+	smtpd_sasl_local_domain = $myhostname
+	smtpd_recipient_restrictions = permit_mynetworks, permit_auth_destination, permit_sasl_authenticated, reject
+
+> sudo systemctl restart postfix
+> sudo systemctl restart apache2
+
+# Open your web browser and navigate to:
+http://your_server_ip/mail
